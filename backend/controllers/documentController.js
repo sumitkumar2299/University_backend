@@ -1,31 +1,20 @@
 const Document = require('../models/Document');
 const User = require('../models/User');
-const cloudinary = require('cloudinary').v2;
 const { sendEmail } = require('../utils/email');
-
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
 
 const uploadDocument = async (req, res) => {
   try {
     const { branch, semester, subject, type } = req.body;
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
-    // Upload to Cloudinary
-    const result = await cloudinary.uploader.upload(req.file.path, {
-      resource_type: 'raw',
-      folder: 'academic_resources',
-      format: 'pdf',
-    });
+    // Save local file path
+    const fileUrl = `/uploads/${req.file.filename}`;
     const doc = new Document({
       uploader: req.user._id,
       branch,
       semester,
       subject,
       type,
-      fileUrl: result.secure_url,
+      fileUrl,
       status: 'pending',
     });
     await doc.save();
@@ -37,7 +26,11 @@ const uploadDocument = async (req, res) => {
 
 const getAllDocuments = async (req, res) => {
   try {
-    const docs = await Document.find().populate('uploader', 'name email branch');
+    const docs = await Document.find()
+      .populate('uploader', 'name email branch')
+      .populate('branch', 'name')
+      .populate('semester', 'number name')
+      .populate('subject', 'name');
     res.json(docs);
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch documents', error: err.message });
@@ -54,7 +47,7 @@ const approveDocument = async (req, res) => {
     await sendEmail({
       to: doc.uploader.email,
       subject: 'Your document has been approved',
-      html: `<p>Hi ${doc.uploader.name},</p><p>Your document has been approved and is now available to all students. Thank you for your contribution!</p>`
+      html: `<p>Hi ${doc.uploader.name},</p><p>Your content is verified and it will be available publicly very soon. Thank you for contributing for the student welfare.</p>`
     });
     res.json({ message: 'Document approved', document: doc });
   } catch (err) {
@@ -103,13 +96,26 @@ const getPublicDocuments = async (req, res) => {
     const { branch, semester, subject, type } = req.query;
     const filter = { status: { $in: ['approved', 'featured'] } };
     if (branch) filter.branch = branch;
-    if (semester) filter.semester = Number(semester);
+    if (semester) filter.semester = semester;
     if (subject) filter.subject = subject;
     if (type) filter.type = type;
-    const docs = await Document.find(filter).populate('uploader', 'name');
+    const docs = await Document.find(filter)
+      .populate('uploader', 'name')
+      .populate('branch', 'name')
+      .populate('semester', 'number name')
+      .populate('subject', 'name');
     res.json(docs);
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch public documents', error: err.message });
+  }
+};
+
+const getMyDocuments = async (req, res) => {
+  try {
+    const docs = await Document.find({ uploader: req.user._id });
+    res.json(docs);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch your documents', error: err.message });
   }
 };
 
@@ -120,4 +126,5 @@ module.exports = {
   rejectDocument,
   featureDocument,
   getPublicDocuments,
+  getMyDocuments,
 }; 

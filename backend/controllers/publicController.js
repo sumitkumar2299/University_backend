@@ -15,4 +15,17 @@ const getPublicContent = async (req, res) => {
   }
 };
 
-module.exports = { getPublicContent }; 
+const getSubjects = async (req, res) => {
+  try {
+    const { branch, semester } = req.query;
+    if (!branch || !semester) return res.status(400).json({ message: 'Branch and semester required' });
+    // Find all approved documents for the branch and semester, and get unique subjects
+    const docs = await Document.find({ branch, semester, status: 'approved' });
+    const subjects = [...new Set(docs.map(doc => doc.subject?.name || doc.subject))];
+    res.json(subjects);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch subjects', error: err.message });
+  }
+};
+
+module.exports = { getPublicContent, getSubjects }; 

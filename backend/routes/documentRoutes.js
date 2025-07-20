@@ -23,6 +23,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({ storage, fileFilter });
 
 router.post('/', requireAuth, upload.single('file'), documentController.uploadDocument);
+router.get('/my', requireAuth, documentController.getMyDocuments);
 router.get('/', requireAuth, requireRole('admin'), documentController.getAllDocuments);
 router.patch('/:id/approve', requireAuth, requireRole('admin'), documentController.approveDocument);
 router.patch('/:id/reject', requireAuth, requireRole('admin'), documentController.rejectDocument);
